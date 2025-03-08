@@ -33,8 +33,9 @@ export async function POST(request: Request) {
     }
 
     try {
+      console.log('Calling OpenAI API...');
       const response = await openai.chat.completions.create({
-        model: "gpt-4-vision-preview",
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "user",
@@ -53,8 +54,10 @@ export async function POST(request: Request) {
           }
         ],
         max_tokens: 1000,
+        temperature: 0, // Add temperature 0 for more consistent results
       });
 
+      console.log('OpenAI API response received');
       const result = response.choices[0]?.message?.content;
       if (!result) {
         console.error('No response content from OpenAI');
@@ -63,19 +66,24 @@ export async function POST(request: Request) {
 
       // Parse the JSON response from GPT-4
       try {
+        console.log('Parsing OpenAI response:', result);
         const parsedResult = JSON.parse(result);
         return NextResponse.json(parsedResult);
       } catch (parseError) {
-        console.error('Error parsing OpenAI response:', parseError);
+        console.error('Error parsing OpenAI response:', parseError, '\nRaw response:', result);
         return NextResponse.json(
           { error: 'Failed to parse OpenAI response' },
           { status: 500 }
         );
       }
-    } catch (openaiError) {
-      console.error('OpenAI API error:', openaiError);
+    } catch (openaiError: any) {
+      console.error('OpenAI API error:', {
+        message: openaiError.message,
+        response: openaiError.response?.data,
+        status: openaiError.response?.status,
+      });
       return NextResponse.json(
-        { error: 'Error calling OpenAI API' },
+        { error: `Error calling OpenAI API: ${openaiError.message}` },
         { status: 500 }
       );
     }
