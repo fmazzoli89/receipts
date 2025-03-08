@@ -16,10 +16,19 @@ interface ReceiptData {
 // Initialize the Google Sheets API client
 const sheets = google.sheets('v4');
 
+// Function to properly format the private key
+function formatPrivateKey(key: string | undefined): string {
+  if (!key) return '';
+  // Remove any extra quotes from the beginning and end
+  key = key.replace(/^["']|["']$/g, '');
+  // Replace literal \n with actual newlines
+  return key.replace(/\\n/g, '\n');
+}
+
 // Create JWT client for authentication using environment variables
 const auth = new google.auth.JWT({
   email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-  key: process.env.GOOGLE_PRIVATE_KEY?.split(String.raw`\n`).join('\n'), // Handle newlines properly
+  key: formatPrivateKey(process.env.GOOGLE_PRIVATE_KEY),
   scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
 
@@ -56,10 +65,13 @@ export async function POST(request: Request) {
     console.log('Starting Google Sheets API request');
 
     // Log all environment variables (without sensitive data)
+    const privateKey = process.env.GOOGLE_PRIVATE_KEY || '';
     console.log('Environment variables check:', {
       hasSheetId: !!SPREADSHEET_ID,
       hasEmail: !!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      hasKey: !!process.env.GOOGLE_PRIVATE_KEY,
+      hasKey: !!privateKey,
+      keyStartsWith: privateKey.startsWith('-----BEGIN PRIVATE KEY-----'),
+      keyEndsWith: privateKey.endsWith('-----END PRIVATE KEY-----'),
       sheetIdLength: SPREADSHEET_ID?.length,
       emailDomain: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL?.split('@')[1],
     });
