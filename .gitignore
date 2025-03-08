@@ -36,3 +36,4 @@ next-env.d.ts
 
 # secrets
 src/config/service-account.json
+config/service-account.json
