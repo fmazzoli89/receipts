@@ -58,7 +58,7 @@ export async function POST(request: Request) {
         temperature: 0,
       });
 
-      console.log('OpenAI API response received');
+      console.log('OpenAI API response received:', response);
       const result = response.choices[0]?.message?.content;
       if (!result) {
         console.error('No response content from OpenAI');
