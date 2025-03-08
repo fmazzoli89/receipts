@@ -52,34 +52,58 @@ function validateReceiptData(data: any): data is ReceiptData {
 
 export async function POST(request: Request) {
   try {
-    // Validate environment variables
+    // Log the start of the request
+    console.log('Starting Google Sheets API request');
+
+    // Log all environment variables (without sensitive data)
+    console.log('Environment variables check:', {
+      hasSheetId: !!SPREADSHEET_ID,
+      hasEmail: !!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      hasKey: !!process.env.GOOGLE_PRIVATE_KEY,
+      sheetIdLength: SPREADSHEET_ID?.length,
+      emailDomain: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL?.split('@')[1],
+    });
+
+    // Validate environment variables with detailed logging
     if (!SPREADSHEET_ID) {
-      console.error('Google Sheets ID not configured');
-      return NextResponse.json({ error: 'Google Sheets ID not configured' }, { status: 500 });
+      const error = 'Google Sheets ID not configured';
+      console.error(error);
+      return NextResponse.json({ error }, { status: 500 });
     }
 
-    if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY) {
-      console.error('Google Sheets credentials not configured');
-      return NextResponse.json({ error: 'Google Sheets credentials not configured' }, { status: 500 });
+    if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL) {
+      const error = 'Google Service Account Email not configured';
+      console.error(error);
+      return NextResponse.json({ error }, { status: 500 });
     }
+
+    if (!process.env.GOOGLE_PRIVATE_KEY) {
+      const error = 'Google Private Key not configured';
+      console.error(error);
+      return NextResponse.json({ error }, { status: 500 });
+    }
+
+    console.log('Environment variables validated successfully');
 
     const receiptData = await request.json();
+    console.log('Received receipt data:', JSON.stringify(receiptData, null, 2));
 
     // Validate receipt data
     if (!validateReceiptData(receiptData)) {
-      console.error('Invalid receipt data structure:', receiptData);
-      return NextResponse.json({ error: 'Invalid receipt data structure' }, { status: 400 });
+      const error = 'Invalid receipt data structure';
+      console.error(error, JSON.stringify(receiptData, null, 2));
+      return NextResponse.json({ error, receivedData: receiptData }, { status: 400 });
     }
 
+    console.log('Receipt data validated successfully');
+
     const formattedDate = formatDate(receiptData.date);
+    console.log('Formatted date:', formattedDate);
 
     // Prepare the rows to append
     const rows = [
-      // Header row with receipt info
       [formattedDate, receiptData.storeName, 'RECEIPT TOTAL', receiptData.total.toFixed(2)],
-      // Empty row for spacing
       ['', '', '', ''],
-      // Individual items
       ...receiptData.items.map((item: ReceiptItem) => [
         formattedDate,
         receiptData.storeName,
@@ -88,37 +112,71 @@ export async function POST(request: Request) {
       ])
     ];
 
+    console.log('Prepared rows for Google Sheets:', JSON.stringify(rows, null, 2));
+
     // Try to append data with retries
     let retries = 3;
     while (retries > 0) {
       try {
-        await sheets.spreadsheets.values.append({
+        console.log(`Attempting to append data (${retries} retries remaining)`);
+        
+        // Log auth object (without sensitive data)
+        console.log('Auth configuration:', {
+          hasEmail: !!auth.email,
+          hasKey: !!auth.key,
+          scopes: auth.scopes,
+        });
+
+        const response = await sheets.spreadsheets.values.append({
           spreadsheetId: SPREADSHEET_ID,
-          range: 'Sheet1!A:D', // Assumes first sheet with columns: Date, Store, Item, Price
+          range: 'Sheet1!A:D',
           valueInputOption: 'USER_ENTERED',
           requestBody: {
             values: rows,
           },
           auth: auth,
         });
-        break; // Success, exit loop
-      } catch (error) {
+
+        console.log('Successfully appended data to Google Sheets', response.data);
+        
+        return NextResponse.json({ 
+          success: true,
+          message: 'Receipt data saved successfully',
+          rowsAdded: rows.length,
+          updatedRange: response.data.updates?.updatedRange
+        });
+      } catch (error: any) {
+        console.error('Detailed error information:', {
+          message: error.message,
+          code: error.code,
+          status: error.status,
+          details: error.errors,
+          stack: error.stack,
+        });
+        
         retries--;
-        if (retries === 0) throw error; // Throw if all retries failed
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+        if (retries === 0) {
+          throw new Error(`Failed to append to Google Sheets: ${error.message}`);
+        }
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
-
-    return NextResponse.json({ 
-      success: true,
-      message: 'Receipt data saved successfully',
-      rowsAdded: rows.length
-    });
   } catch (error: any) {
-    console.error('Error appending to sheet:', error);
+    // Log the complete error object
+    console.error('Fatal error in Google Sheets API:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      status: error.status,
+      details: error.errors,
+    });
+    
     return NextResponse.json({ 
       error: 'Failed to append to sheet',
-      details: error.message
+      details: error.message,
+      errorCode: error.code,
+      errorStatus: error.status,
+      timestamp: new Date().toISOString()
     }, { status: 500 });
   }
 } 
