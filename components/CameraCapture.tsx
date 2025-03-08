@@ -6,7 +6,6 @@ import { Camera, Upload, Loader2, Save, Edit } from 'lucide-react';
 import { processReceipt, type ReceiptData, type ReceiptItem } from '@/utils/ocr';
 
 export default function CameraCapture() {
-  const [isCapturing, setIsCapturing] = useState(false);
   const [image, setImage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
@@ -18,10 +17,9 @@ export default function CameraCapture() {
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        // Calculate new dimensions while maintaining aspect ratio
         let width = img.width;
         let height = img.height;
-        const maxDimension = 1024; // Max dimension of 1024px
+        const maxDimension = 1024;
         
         if (width > height && width > maxDimension) {
           height = (height * maxDimension) / width;
@@ -41,7 +39,6 @@ export default function CameraCapture() {
         }
         
         ctx.drawImage(img, 0, 0, width, height);
-        // Convert to JPEG with 0.8 quality
         resolve(canvas.toDataURL('image/jpeg', 0.8));
       };
       
@@ -58,7 +55,6 @@ export default function CameraCapture() {
     
     setIsProcessing(true);
     try {
-      // Optimize image before processing
       const optimizedImage = await optimizeImage(imageSrc);
       const data = await processReceipt(optimizedImage);
       if (!data) {
@@ -78,7 +74,6 @@ export default function CameraCapture() {
         }
       }
       alert(errorMessage);
-      // Reset the state on error
       setImage(null);
       setReceiptData(null);
     } finally {
@@ -91,7 +86,6 @@ export default function CameraCapture() {
 
     setIsSaving(true);
     try {
-      // First try to save to Google Sheets
       const response = await fetch('/api/sheets', {
         method: 'POST',
         headers: {
@@ -105,15 +99,11 @@ export default function CameraCapture() {
         throw new Error(errorData.error || errorData.details || 'Failed to save receipt');
       }
 
-      // Only show success message and reset if the save was successful
       alert('Receipt saved successfully!');
-      // Reset the form
       setImage(null);
       setReceiptData(null);
-      setIsCapturing(false);
     } catch (error) {
       console.error('Error saving receipt:', error);
-      // Show more specific error message
       let errorMessage = 'Error saving receipt. Please try again.';
       if (error instanceof Error) {
         if (error.message.includes('storage is not allowed')) {
@@ -134,14 +124,12 @@ export default function CameraCapture() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       alert('Please upload an image file');
       return;
     }
 
-    // Validate file size (max 10MB)
-    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
+    const MAX_FILE_SIZE = 10 * 1024 * 1024;
     if (file.size > MAX_FILE_SIZE) {
       alert('Please upload an image smaller than 10MB');
       return;
@@ -188,54 +176,57 @@ export default function CameraCapture() {
     }
   }, [webcamRef]);
 
+  const openGoogleSheet = () => {
+    const sheetId = process.env.NEXT_PUBLIC_GOOGLE_SHEETS_ID;
+    if (sheetId) {
+      window.open(`https://docs.google.com/spreadsheets/d/${sheetId}`, '_blank');
+    } else {
+      alert('Google Sheet ID not configured');
+    }
+  };
+
   return (
     <div className="space-y-4">
-      {!isCapturing && !image && (
+      {!image && (
         <div className="space-y-4">
-          <button
-            onClick={() => setIsCapturing(true)}
-            className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <Camera className="w-5 h-5" />
-            Capture Receipt
-          </button>
           <div className="relative">
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleFileUpload}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            <Webcam
+              audio={false}
+              ref={webcamRef}
+              screenshotFormat="image/jpeg"
+              className="w-full rounded-lg"
             />
-            <button className="w-full flex items-center justify-center gap-2 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors">
-              <Upload className="w-5 h-5" />
-              Upload Receipt
-            </button>
+            <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-4 px-4">
+              <button
+                onClick={capture}
+                className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Camera className="w-5 h-5" />
+                Capture Receipt
+              </button>
+              <div className="relative flex-1">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileUpload}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                />
+                <button className="w-full flex items-center justify-center gap-2 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors">
+                  <Upload className="w-5 h-5" />
+                  Upload Receipt
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
-
-      {isCapturing && !image && (
-        <div className="relative">
-          <Webcam
-            audio={false}
-            ref={webcamRef}
-            screenshotFormat="image/jpeg"
-            className="w-full rounded-lg"
-          />
-          <div className="absolute bottom-4 left-0 right-0 flex justify-center space-x-4">
-            <button
-              onClick={() => setIsCapturing(false)}
-              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={capture}
-              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
-            >
-              Capture
-            </button>
-          </div>
+          <button
+            onClick={openGoogleSheet}
+            className="w-full flex items-center justify-center gap-2 bg-green-100 text-green-700 px-4 py-2 rounded-lg hover:bg-green-200 transition-colors"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19.5 3h-15A1.5 1.5 0 003 4.5v15A1.5 1.5 0 004.5 21h15a1.5 1.5 0 001.5-1.5v-15A1.5 1.5 0 0019.5 3zm-1 4h-13v11h13V7zm-11 9v-2h9v2h-9zm0-3v-2h9v2h-9zm0-3V8h9v2h-9z"/>
+            </svg>
+            Open Google Sheet
+          </button>
         </div>
       )}
 
@@ -252,13 +243,16 @@ export default function CameraCapture() {
             <div className="space-y-4">
               <div className="bg-white p-4 rounded-lg shadow">
                 <h3 className="font-semibold text-lg mb-2">{receiptData.storeName}</h3>
-                <p className="text-sm text-gray-600 mb-4">{receiptData.date}</p>
+                <p className="text-sm text-gray-600 mb-4">{receiptData.datetime}</p>
                 
                 <div className="space-y-2">
                   {receiptData.items.map((item: ReceiptItem, index: number) => (
                     <div key={index} className="flex justify-between items-center">
-                      <span>{item.name}</span>
-                      <span>${item.price.toFixed(2)}</span>
+                      <div className="flex-1">
+                        <span>{item.name}</span>
+                        <span className="ml-2 text-sm text-gray-500">({item.category})</span>
+                      </div>
+                      <span className="ml-4">${item.price.toFixed(2)}</span>
                     </div>
                   ))}
                   <div className="border-t pt-2 mt-2 flex justify-between items-center font-semibold">
@@ -273,7 +267,6 @@ export default function CameraCapture() {
                   onClick={() => {
                     setImage(null);
                     setReceiptData(null);
-                    setIsCapturing(false);
                   }}
                   className="flex-1 flex items-center justify-center gap-2 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors"
                 >
@@ -298,7 +291,6 @@ export default function CameraCapture() {
             <button
               onClick={() => {
                 setImage(null);
-                setIsCapturing(false);
               }}
               className="w-full bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors"
             >

@@ -1,12 +1,13 @@
 export interface ReceiptItem {
   name: string;
   price: number;
+  category: string;
 }
 
 export interface ReceiptData {
   items: ReceiptItem[];
   total: number;
-  date: string;
+  datetime: string;
   storeName: string;
 }
 
@@ -47,7 +48,7 @@ export async function processReceipt(imageData: string): Promise<ReceiptData> {
       throw new Error('Invalid response data');
     }
 
-    if (!data.storeName || !data.date || !Array.isArray(data.items) || typeof data.total !== 'number') {
+    if (!data.storeName || !data.datetime || !Array.isArray(data.items) || typeof data.total !== 'number') {
       console.error('Invalid response structure:', data);
       throw new Error('Invalid receipt data structure');
     }

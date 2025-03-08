@@ -4,11 +4,12 @@ import { NextResponse } from 'next/server';
 interface ReceiptItem {
   name: string;
   price: number;
+  category: string;
 }
 
 interface ReceiptData {
   storeName: string;
-  date: string;
+  datetime: string;
   items: ReceiptItem[];
   total: number;
 }
@@ -66,10 +67,12 @@ function validateReceiptData(data: any): data is ReceiptData {
   return (
     data &&
     typeof data.storeName === 'string' &&
-    typeof data.date === 'string' &&
+    typeof data.datetime === 'string' &&
     Array.isArray(data.items) &&
     data.items.every((item: any) =>
-      typeof item.name === 'string' && typeof item.price === 'number'
+      typeof item.name === 'string' && 
+      typeof item.price === 'number' &&
+      typeof item.category === 'string'
     ) &&
     typeof data.total === 'number'
   );
@@ -146,20 +149,17 @@ export async function POST(request: Request) {
 
     console.log('Receipt data validated successfully');
 
-    const formattedDate = formatDate(receiptData.date);
+    const formattedDate = formatDate(receiptData.datetime);
     console.log('Formatted date:', formattedDate);
 
     // Prepare the rows to append
-    const rows = [
-      [formattedDate, receiptData.storeName, 'RECEIPT TOTAL', receiptData.total.toFixed(2)],
-      ['', '', '', ''],
-      ...receiptData.items.map((item: ReceiptItem) => [
-        formattedDate,
-        receiptData.storeName,
-        item.name,
-        item.price.toFixed(2),
-      ])
-    ];
+    const rows = receiptData.items.map((item: ReceiptItem) => [
+      receiptData.datetime,
+      receiptData.storeName,
+      item.name,
+      item.category,
+      item.price.toFixed(2)
+    ]);
 
     console.log('Prepared rows for Google Sheets:', JSON.stringify(rows, null, 2));
 
@@ -178,7 +178,7 @@ export async function POST(request: Request) {
 
         const response = await sheets.spreadsheets.values.append({
           spreadsheetId: SPREADSHEET_ID,
-          range: 'Sheet1!A:D',
+          range: 'Sheet1!A:E',  // Updated to include all 5 columns
           valueInputOption: 'USER_ENTERED',
           requestBody: {
             values: rows,
