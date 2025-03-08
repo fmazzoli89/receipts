@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback } from 'react';
 import Webcam from 'react-webcam';
-import { Camera, Upload, Loader2, Save, Edit, SwitchCamera } from 'lucide-react';
+import { Camera, Upload, Loader2, Save, Edit, SwitchCamera, Maximize2, Minimize2 } from 'lucide-react';
 import { processReceipt, type ReceiptData, type ReceiptItem } from '@/utils/ocr';
 import toast from 'react-hot-toast';
 
@@ -12,6 +12,7 @@ export default function CameraCapture() {
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
+  const [isImageExpanded, setIsImageExpanded] = useState(false);
   const webcamRef = useRef<Webcam>(null);
 
   const optimizeImage = async (imageSrc: string): Promise<string> => {
@@ -191,6 +192,13 @@ export default function CameraCapture() {
     setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
   };
 
+  const toggleImageSize = () => {
+    setIsImageExpanded(!isImageExpanded);
+    if (!isImageExpanded) {
+      toast('Click again to minimize', { icon: '🔍' });
+    }
+  };
+
   return (
     <div className="space-y-4">
       {!image && (
@@ -248,71 +256,89 @@ export default function CameraCapture() {
 
       {image && (
         <div className="space-y-4">
-          <img src={image} alt="Captured receipt" className="w-full rounded-lg" />
-          
-          {isProcessing ? (
-            <div className="flex items-center justify-center gap-2 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg">
-              <Loader2 className="w-5 h-5 animate-spin" />
-              Processing Receipt...
+          <div className="flex items-start gap-4">
+            <div className={`relative transition-all duration-300 ${isImageExpanded ? 'w-full' : 'w-24'}`}>
+              <img 
+                src={image} 
+                alt="Captured receipt" 
+                className={`rounded-lg cursor-pointer transition-all duration-300 ${isImageExpanded ? 'w-full' : 'w-24 h-24 object-cover'}`}
+                onClick={toggleImageSize}
+              />
+              <button
+                onClick={toggleImageSize}
+                className="absolute top-2 right-2 p-1.5 bg-gray-800 bg-opacity-50 text-white rounded-full hover:bg-opacity-70 transition-opacity"
+                aria-label={isImageExpanded ? "Minimize image" : "Expand image"}
+              >
+                {isImageExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+              </button>
             </div>
-          ) : receiptData ? (
-            <div className="space-y-4">
-              <div className="bg-white p-4 rounded-lg shadow">
-                <h3 className="font-semibold text-lg mb-2">{receiptData.storeName}</h3>
-                <p className="text-sm text-gray-600 mb-4">{receiptData.datetime}</p>
-                
-                <div className="space-y-2">
-                  {receiptData.items.map((item: ReceiptItem, index: number) => (
-                    <div key={index} className="flex justify-between items-center">
-                      <div className="flex-1">
-                        <span>{item.name}</span>
-                        <span className="ml-2 text-sm text-gray-500">({item.category})</span>
+            
+            {isProcessing ? (
+              <div className="flex-1 flex items-center justify-center gap-2 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Processing Receipt...
+              </div>
+            ) : receiptData ? (
+              <div className="flex-1 space-y-4">
+                <div className="bg-white p-4 rounded-lg shadow">
+                  <h3 className="font-semibold text-lg mb-2">{receiptData.storeName}</h3>
+                  <p className="text-sm text-gray-600 mb-4">{receiptData.datetime}</p>
+                  
+                  <div className="space-y-2">
+                    {receiptData.items.map((item: ReceiptItem, index: number) => (
+                      <div key={index} className="flex justify-between items-center">
+                        <div className="flex-1">
+                          <span>{item.name}</span>
+                          <span className="ml-2 text-sm text-gray-500">({item.category})</span>
+                        </div>
+                        <span className="ml-4">${item.price.toFixed(2)}</span>
                       </div>
-                      <span className="ml-4">${item.price.toFixed(2)}</span>
+                    ))}
+                    <div className="border-t pt-2 mt-2 flex justify-between items-center font-semibold">
+                      <span>Total</span>
+                      <span>${receiptData.total.toFixed(2)}</span>
                     </div>
-                  ))}
-                  <div className="border-t pt-2 mt-2 flex justify-between items-center font-semibold">
-                    <span>Total</span>
-                    <span>${receiptData.total.toFixed(2)}</span>
                   </div>
                 </div>
-              </div>
 
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    setImage(null);
-                    setReceiptData(null);
-                  }}
-                  className="flex-1 flex items-center justify-center gap-2 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors"
-                >
-                  <Edit className="w-5 h-5" />
-                  Retake
-                </button>
-                <button
-                  onClick={handleSave}
-                  disabled={isSaving}
-                  className="flex-1 flex items-center justify-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-                >
-                  {isSaving ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <Save className="w-5 h-5" />
-                  )}
-                  Save
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setImage(null);
+                      setReceiptData(null);
+                      setIsImageExpanded(false);
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+                  >
+                    <Edit className="w-5 h-5" />
+                    Retake
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className="flex-1 flex items-center justify-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                  >
+                    {isSaving ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <Save className="w-5 h-5" />
+                    )}
+                    Save
+                  </button>
+                </div>
               </div>
-            </div>
-          ) : (
-            <button
-              onClick={() => {
-                setImage(null);
-              }}
-              className="w-full bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors"
-            >
-              Try Again
-            </button>
-          )}
+            ) : (
+              <button
+                onClick={() => {
+                  setImage(null);
+                  setIsImageExpanded(false);
+                }}
+                className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+              >
+                Try Again
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>
