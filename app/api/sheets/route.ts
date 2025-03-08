@@ -1,6 +1,5 @@
 import { google } from 'googleapis';
-import { OAuth2Client } from 'google-auth-library';
-import { ReceiptData } from './ocr';
+import { NextResponse } from 'next/server';
 
 // Initialize the Google Sheets API client
 const sheets = google.sheets('v4');
@@ -14,20 +13,22 @@ const auth = new google.auth.JWT({
 
 const SPREADSHEET_ID = process.env.GOOGLE_SHEETS_ID;
 
-export async function appendToSheet(receiptData: ReceiptData) {
-  if (!SPREADSHEET_ID) {
-    throw new Error('Google Sheets ID not configured');
-  }
-
-  // Prepare the rows to append
-  const rows = receiptData.items.map(item => [
-    receiptData.date,
-    receiptData.storeName,
-    item.name,
-    item.price.toString(),
-  ]);
-
+export async function POST(request: Request) {
   try {
+    const receiptData = await request.json();
+
+    if (!SPREADSHEET_ID) {
+      return NextResponse.json({ error: 'Google Sheets ID not configured' }, { status: 500 });
+    }
+
+    // Prepare the rows to append
+    const rows = receiptData.items.map((item: any) => [
+      receiptData.date,
+      receiptData.storeName,
+      item.name,
+      item.price.toString(),
+    ]);
+
     await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
       range: 'Sheet1!A:D', // Assumes first sheet with columns: Date, Store, Item, Price
@@ -38,9 +39,9 @@ export async function appendToSheet(receiptData: ReceiptData) {
       auth: auth,
     });
 
-    return true;
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error appending to sheet:', error);
-    throw error;
+    return NextResponse.json({ error: 'Failed to append to sheet' }, { status: 500 });
   }
 } 

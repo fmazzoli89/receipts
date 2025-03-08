@@ -4,7 +4,6 @@ import { useState, useRef, useCallback } from 'react';
 import Webcam from 'react-webcam';
 import { Camera, Upload, Loader2, Save, Edit } from 'lucide-react';
 import { processReceipt, type ReceiptData, type ReceiptItem } from '@/utils/ocr';
-import { appendToSheet } from '@/utils/sheets';
 
 export default function CameraCapture() {
   const [isCapturing, setIsCapturing] = useState(false);
@@ -42,7 +41,18 @@ export default function CameraCapture() {
 
     setIsSaving(true);
     try {
-      await appendToSheet(receiptData);
+      const response = await fetch('/api/sheets', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(receiptData),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save receipt');
+      }
+
       alert('Receipt saved successfully!');
       // Reset the form
       setImage(null);
