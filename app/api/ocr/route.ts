@@ -21,7 +21,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No image provided' }, { status: 400 });
     }
 
-    // Remove the "data:image/jpeg;base64," prefix if present
+    // Determine the correct MIME type
+    const mimeType = image.startsWith('data:image/png') ? 'image/png' : 'image/jpeg';
     const base64Image = image.replace(/^data:image\/[a-z]+;base64,/, '');
 
     // Validate base64 string
@@ -35,40 +36,26 @@ export async function POST(request: Request) {
     try {
       console.log('Calling OpenAI API...');
       const response = await openai.chat.completions.create({
-        // model: "gpt-4o-mini",
-        // messages: [
-        //   {
-        //     role: "user",
-        //     content: [
-        //       {
-        //         type: "text",
-        //         text: "This is a receipt image. Please extract the following information in a structured way: store name, date, all items with their prices, and the total amount. Return the data in JSON format with this structure: { storeName: string, date: string, items: Array<{ name: string, price: number }>, total: number }. Make sure all prices are numbers, not strings. If you can't read something clearly, make your best guess but try to maintain accuracy."
-        //       },
-        //       {
-        //         type: "image_url",
-        //         image_url: {
-        //           url: `data:image/jpeg;base64,${base64Image}`
-        //         }
-        //       }
-        //     ]
-        //   }
-        // ],
-        model: "gpt-4o-mini",
+        model: "gpt-4-vision-preview",
         messages: [
-        {
-            "role": "user",
-            "content": [
-                {"type": "text",
-                  "text": "Get structured data from this image"},
-                {
-                  "type": "image_url",
-                  "image_url": {"url": "data:image/jpeg;base64,{base64_image}"},
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: "This is a receipt image. Please extract the following information in a structured way: store name, date, all items with their prices, and the total amount. Return the data in JSON format with this structure: { storeName: string, date: string, items: Array<{ name: string, price: number }>, total: number }. Make sure all prices are numbers, not strings. If you can't read something clearly, make your best guess but try to maintain accuracy."
               },
-            ],
-        }
-    ],
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:${mimeType};base64,${base64Image}`
+                }
+              }
+            ]
+          }
+        ],
         max_tokens: 1000,
-        temperature: 0, // Add temperature 0 for more consistent results
+        temperature: 0,
       });
 
       console.log('OpenAI API response received');
