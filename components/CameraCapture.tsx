@@ -2,14 +2,16 @@
 
 import { useState, useRef, useCallback } from 'react';
 import Webcam from 'react-webcam';
-import { Camera, Upload, Loader2, Save, Edit } from 'lucide-react';
+import { Camera, Upload, Loader2, Save, Edit, SwitchCamera } from 'lucide-react';
 import { processReceipt, type ReceiptData, type ReceiptItem } from '@/utils/ocr';
+import toast from 'react-hot-toast';
 
 export default function CameraCapture() {
   const [image, setImage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const webcamRef = useRef<Webcam>(null);
 
   const optimizeImage = async (imageSrc: string): Promise<string> => {
@@ -49,7 +51,7 @@ export default function CameraCapture() {
 
   const handleImageProcessing = async (imageSrc: string | null) => {
     if (!imageSrc) {
-      alert('No image data available');
+      toast.error('No image data available');
       return;
     }
     
@@ -73,7 +75,7 @@ export default function CameraCapture() {
           errorMessage = 'Failed to load image. Please try a different image.';
         }
       }
-      alert(errorMessage);
+      toast.error(errorMessage);
       setImage(null);
       setReceiptData(null);
     } finally {
@@ -99,7 +101,7 @@ export default function CameraCapture() {
         throw new Error(errorData.error || errorData.details || 'Failed to save receipt');
       }
 
-      alert('Receipt saved successfully!');
+      toast.success('Receipt saved successfully!');
       setImage(null);
       setReceiptData(null);
     } catch (error) {
@@ -114,7 +116,7 @@ export default function CameraCapture() {
           errorMessage = `Error: ${error.message}`;
         }
       }
-      alert(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -125,13 +127,13 @@ export default function CameraCapture() {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      alert('Please upload an image file');
+      toast.error('Please upload an image file');
       return;
     }
 
     const MAX_FILE_SIZE = 10 * 1024 * 1024;
     if (file.size > MAX_FILE_SIZE) {
-      alert('Please upload an image smaller than 10MB');
+      toast.error('Please upload an image smaller than 10MB');
       return;
     }
 
@@ -139,7 +141,7 @@ export default function CameraCapture() {
     
     reader.onerror = () => {
       console.error('FileReader error:', reader.error);
-      alert('Error reading file. Please try again.');
+      toast.error('Error reading file. Please try again.');
     };
 
     reader.onloadend = () => {
@@ -152,7 +154,7 @@ export default function CameraCapture() {
         handleImageProcessing(imageSrc);
       } catch (error) {
         console.error('Error processing file:', error);
-        alert('Error processing file. Please try again.');
+        toast.error('Error processing file. Please try again.');
       }
     };
 
@@ -160,7 +162,7 @@ export default function CameraCapture() {
       reader.readAsDataURL(file);
     } catch (error) {
       console.error('Error reading file:', error);
-      alert('Error reading file. Please try again.');
+      toast.error('Error reading file. Please try again.');
     }
   };
 
@@ -171,7 +173,7 @@ export default function CameraCapture() {
         setImage(imageSrc);
         handleImageProcessing(imageSrc);
       } else {
-        alert('Failed to capture image. Please try again.');
+        toast.error('Failed to capture image. Please try again.');
       }
     }
   }, [webcamRef]);
@@ -181,8 +183,12 @@ export default function CameraCapture() {
     if (sheetId) {
       window.open(`https://docs.google.com/spreadsheets/d/${sheetId}`, '_blank');
     } else {
-      alert('Google Sheet ID not configured');
+      toast.error('Google Sheet ID not configured');
     }
+  };
+
+  const toggleCamera = () => {
+    setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
   };
 
   return (
@@ -195,6 +201,9 @@ export default function CameraCapture() {
               ref={webcamRef}
               screenshotFormat="image/jpeg"
               className="w-full rounded-lg"
+              videoConstraints={{
+                facingMode: facingMode,
+              }}
             />
             <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-4 px-4">
               <button
@@ -217,6 +226,13 @@ export default function CameraCapture() {
                 </button>
               </div>
             </div>
+            <button
+              onClick={toggleCamera}
+              className="absolute top-4 right-4 p-2 bg-gray-800 bg-opacity-50 text-white rounded-full hover:bg-opacity-70 transition-opacity"
+              aria-label="Switch Camera"
+            >
+              <SwitchCamera className="w-5 h-5" />
+            </button>
           </div>
           <button
             onClick={openGoogleSheet}
