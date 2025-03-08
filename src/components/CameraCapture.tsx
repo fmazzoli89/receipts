@@ -3,8 +3,8 @@
 import { useState, useRef, useCallback } from 'react';
 import Webcam from 'react-webcam';
 import { Camera, Upload, Loader2, Save, Edit } from 'lucide-react';
-import { processReceipt, type ReceiptData, type ReceiptItem } from '../utils/ocr';
-import { appendToSheet } from '../utils/sheets';
+import { processReceipt, type ReceiptData, type ReceiptItem } from '@/utils/ocr';
+import { appendToSheet } from '@/utils/sheets';
 
 export default function CameraCapture() {
   const [isCapturing, setIsCapturing] = useState(false);
