@@ -75,7 +75,9 @@ export async function POST(request: Request) {
 
       try {
         console.log('Attempting to parse response:', result);
-        const parsedResult = JSON.parse(result);
+        // Clean the response by removing Markdown code block syntax
+        const cleanedResult = result.replace(/^```json\n|\n```$/g, '').trim();
+        const parsedResult = JSON.parse(cleanedResult);
         
         // Validate the parsed result structure
         if (!parsedResult.storeName || !parsedResult.datetime || !Array.isArray(parsedResult.items) || typeof parsedResult.total !== 'number') {
