@@ -91,6 +91,7 @@ export default function CameraCapture() {
 
     setIsSaving(true);
     try {
+      // First try to save to Google Sheets
       const response = await fetch('/api/sheets', {
         method: 'POST',
         headers: {
@@ -100,9 +101,11 @@ export default function CameraCapture() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to save receipt');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || errorData.details || 'Failed to save receipt');
       }
 
+      // Only show success message and reset if the save was successful
       alert('Receipt saved successfully!');
       // Reset the form
       setImage(null);
@@ -110,7 +113,18 @@ export default function CameraCapture() {
       setIsCapturing(false);
     } catch (error) {
       console.error('Error saving receipt:', error);
-      alert('Error saving receipt. Please try again.');
+      // Show more specific error message
+      let errorMessage = 'Error saving receipt. Please try again.';
+      if (error instanceof Error) {
+        if (error.message.includes('storage is not allowed')) {
+          errorMessage = 'Storage access error. Please try again in a new tab.';
+        } else if (error.message.includes('Google Sheets')) {
+          errorMessage = 'Error saving to Google Sheets. Please check your configuration.';
+        } else {
+          errorMessage = `Error: ${error.message}`;
+        }
+      }
+      alert(errorMessage);
     } finally {
       setIsSaving(false);
     }

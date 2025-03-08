@@ -19,15 +19,31 @@ const sheets = google.sheets('v4');
 // Function to properly format the private key
 function formatPrivateKey(key: string | undefined): string {
   if (!key) return '';
-  // Remove any extra quotes from the beginning and end
+  
+  // Remove any surrounding quotes
   key = key.replace(/^["']|["']$/g, '');
-  // Replace literal \n with actual newlines
-  return key.replace(/\\n/g, '\n');
+  
+  // Check if the key already has proper line breaks
+  if (key.includes('\n')) {
+    return key;
+  }
+  
+  // If the key uses \\n, replace with real line breaks
+  if (key.includes('\\n')) {
+    return key.replace(/\\n/g, '\n');
+  }
+  
+  // If the key is a single line, try to format it
+  if (!key.includes('-----BEGIN PRIVATE KEY-----')) {
+    return `-----BEGIN PRIVATE KEY-----\n${key}\n-----END PRIVATE KEY-----`;
+  }
+  
+  return key;
 }
 
 // Create JWT client for authentication using environment variables
 const auth = new google.auth.JWT({
-  email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+  email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL?.trim(),
   key: formatPrivateKey(process.env.GOOGLE_PRIVATE_KEY),
   scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
@@ -59,40 +75,44 @@ function validateReceiptData(data: any): data is ReceiptData {
   );
 }
 
+// Debug function to safely log private key format
+function debugPrivateKey(key: string | undefined): string {
+  if (!key) return 'No key provided';
+  const lines = key.split('\n');
+  return `Key starts with: ${lines[0]}\nKey ends with: ${lines[lines.length - 1]}\nNumber of lines: ${lines.length}`;
+}
+
 export async function POST(request: Request) {
   try {
     // Log the start of the request
     console.log('Starting Google Sheets API request');
 
-    // Log all environment variables (without sensitive data)
+    // Log environment variables check (safely)
     const privateKey = process.env.GOOGLE_PRIVATE_KEY || '';
     console.log('Environment variables check:', {
       hasSheetId: !!SPREADSHEET_ID,
       hasEmail: !!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
       hasKey: !!privateKey,
-      keyStartsWith: privateKey.startsWith('-----BEGIN PRIVATE KEY-----'),
-      keyEndsWith: privateKey.endsWith('-----END PRIVATE KEY-----'),
+      keyFormat: debugPrivateKey(privateKey),
       sheetIdLength: SPREADSHEET_ID?.length,
       emailDomain: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL?.split('@')[1],
     });
 
-    // Validate environment variables with detailed logging
+    // Validate environment variables
     if (!SPREADSHEET_ID) {
-      const error = 'Google Sheets ID not configured';
-      console.error(error);
-      return NextResponse.json({ error }, { status: 500 });
+      throw new Error('Google Sheets ID not configured');
     }
 
     if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL) {
-      const error = 'Google Service Account Email not configured';
-      console.error(error);
-      return NextResponse.json({ error }, { status: 500 });
+      throw new Error('Google Service Account Email not configured');
     }
 
     if (!process.env.GOOGLE_PRIVATE_KEY) {
-      const error = 'Google Private Key not configured';
-      console.error(error);
-      return NextResponse.json({ error }, { status: 500 });
+      throw new Error('Google Private Key not configured');
+    }
+
+    if (!privateKey.includes('BEGIN PRIVATE KEY') || !privateKey.includes('END PRIVATE KEY')) {
+      throw new Error('Invalid private key format - missing header/footer');
     }
 
     console.log('Environment variables validated successfully');
