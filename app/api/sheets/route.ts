@@ -89,13 +89,15 @@ export async function POST(request: Request) {
 
     // Log environment variables check (safely)
     const privateKey = process.env.GOOGLE_PRIVATE_KEY || '';
+    const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || '';
     console.log('Environment variables check:', {
       hasSheetId: !!SPREADSHEET_ID,
-      hasEmail: !!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      hasEmail: !!email,
       hasKey: !!privateKey,
       keyFormat: debugPrivateKey(privateKey),
       sheetIdLength: SPREADSHEET_ID?.length,
-      emailDomain: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL?.split('@')[1],
+      emailDomain: email.split('@')[1],
+      spreadsheetIdPreview: SPREADSHEET_ID ? `${SPREADSHEET_ID.substring(0, 5)}...` : 'not set'
     });
 
     // Validate environment variables
@@ -103,16 +105,31 @@ export async function POST(request: Request) {
       throw new Error('Google Sheets ID not configured');
     }
 
-    if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL) {
+    if (!email) {
       throw new Error('Google Service Account Email not configured');
     }
 
-    if (!process.env.GOOGLE_PRIVATE_KEY) {
+    if (!privateKey) {
       throw new Error('Google Private Key not configured');
     }
 
-    if (!privateKey.includes('BEGIN PRIVATE KEY') || !privateKey.includes('END PRIVATE KEY')) {
-      throw new Error('Invalid private key format - missing header/footer');
+    // First, try to get the spreadsheet metadata to verify access
+    try {
+      const metadataResponse = await sheets.spreadsheets.get({
+        spreadsheetId: SPREADSHEET_ID,
+        auth: auth,
+      });
+      
+      console.log('Successfully accessed spreadsheet:', {
+        title: metadataResponse.data.properties?.title,
+        sheets: metadataResponse.data.sheets?.length,
+        url: `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}`
+      });
+    } catch (error: any) {
+      if (error.code === 404) {
+        throw new Error(`Spreadsheet not found or not accessible. Please verify:\n1. Sheet ID (${SPREADSHEET_ID?.substring(0, 5)}...) is correct\n2. Service account (${email}) has Editor access to the sheet`);
+      }
+      throw error;
     }
 
     console.log('Environment variables validated successfully');
