@@ -1,5 +1,3 @@
-import { createWorker, Worker } from 'tesseract.js';
-
 export interface ReceiptItem {
   name: string;
   price: number;
