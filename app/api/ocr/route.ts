@@ -43,7 +43,7 @@ export async function POST(request: Request) {
             content: [
               {
                 type: "text",
-                text: "This is a receipt image. Please extract the following information in a structured way: store name, date, all items with their prices, and the total amount. Return the data in JSON format with this structure: { storeName: string, date: string, items: Array<{ name: string, price: number }>, total: number }. Make sure all prices are numbers, not strings. If you can't read something clearly, make your best guess but try to maintain accuracy."
+                text: "Extract this information from the receipt and return it in valid JSON format: { storeName: string, date: string, items: [{ name: string, price: number }], total: number }"
               },
               {
                 type: "image_url",
@@ -58,20 +58,42 @@ export async function POST(request: Request) {
         temperature: 0,
       });
 
-      console.log('OpenAI API response received:', response);
+      console.log('Raw OpenAI API response:', JSON.stringify(response, null, 2));
+      
+      if (!response.choices || !response.choices.length) {
+        console.error('Invalid response structure from OpenAI');
+        throw new Error('Invalid response from OpenAI');
+      }
+
       const result = response.choices[0]?.message?.content;
+      console.log('Response content:', result);
+
       if (!result) {
         console.error('No response content from OpenAI');
         throw new Error('No response from OpenAI');
       }
 
-      // Parse the JSON response from GPT-4
+      // Try to clean the response if it's not valid JSON
+      let cleanedResult = result;
+      if (result.includes('```json')) {
+        cleanedResult = result.split('```json')[1].split('```')[0].trim();
+      } else if (result.includes('```')) {
+        cleanedResult = result.split('```')[1].split('```')[0].trim();
+      }
+
       try {
-        console.log('Parsing OpenAI response:', result);
-        const parsedResult = JSON.parse(result);
+        console.log('Attempting to parse response:', cleanedResult);
+        const parsedResult = JSON.parse(cleanedResult);
+        
+        // Validate the parsed result structure
+        if (!parsedResult.storeName || !parsedResult.date || !Array.isArray(parsedResult.items) || typeof parsedResult.total !== 'number') {
+          console.error('Invalid data structure in response:', parsedResult);
+          throw new Error('Invalid data structure in response');
+        }
+
         return NextResponse.json(parsedResult);
       } catch (parseError) {
-        console.error('Error parsing OpenAI response:', parseError, '\nRaw response:', result);
+        console.error('Error parsing OpenAI response:', parseError, '\nCleaned response:', cleanedResult);
         return NextResponse.json(
           { error: 'Failed to parse OpenAI response' },
           { status: 500 }
@@ -82,6 +104,7 @@ export async function POST(request: Request) {
         message: openaiError.message,
         response: openaiError.response?.data,
         status: openaiError.response?.status,
+        stack: openaiError.stack,
       });
       return NextResponse.json(
         { error: `Error calling OpenAI API: ${openaiError.message}` },
