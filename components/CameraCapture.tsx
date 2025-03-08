@@ -22,15 +22,32 @@ export default function CameraCapture() {
   }, [webcamRef]);
 
   const handleImageProcessing = async (imageSrc: string | null) => {
-    if (!imageSrc) return;
+    if (!imageSrc) {
+      alert('No image data available');
+      return;
+    }
     
     setIsProcessing(true);
     try {
       const data = await processReceipt(imageSrc);
+      if (!data) {
+        throw new Error('No data received from receipt processing');
+      }
       setReceiptData(data);
     } catch (error) {
       console.error('Error processing image:', error);
-      alert('Error processing receipt. Please try again.');
+      let errorMessage = 'Error processing receipt. Please try again.';
+      if (error instanceof Error) {
+        if (error.message.includes('too large')) {
+          errorMessage = 'Image is too large. Please use a smaller image.';
+        } else if (error.message.includes('API key')) {
+          errorMessage = 'Server configuration error. Please try again later.';
+        }
+      }
+      alert(errorMessage);
+      // Reset the state on error
+      setImage(null);
+      setReceiptData(null);
     } finally {
       setIsProcessing(false);
     }
@@ -68,14 +85,47 @@ export default function CameraCapture() {
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please upload an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB in bytes
+    if (file.size > MAX_FILE_SIZE) {
+      alert('Please upload an image smaller than 5MB');
+      return;
+    }
+
+    const reader = new FileReader();
+    
+    reader.onerror = () => {
+      console.error('FileReader error:', reader.error);
+      alert('Error reading file. Please try again.');
+    };
+
+    reader.onloadend = () => {
+      try {
         const imageSrc = reader.result as string;
+        if (!imageSrc || typeof imageSrc !== 'string') {
+          throw new Error('Invalid image data');
+        }
         setImage(imageSrc);
         handleImageProcessing(imageSrc);
-      };
+      } catch (error) {
+        console.error('Error processing file:', error);
+        alert('Error processing file. Please try again.');
+      }
+    };
+
+    try {
       reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('Error reading file:', error);
+      alert('Error reading file. Please try again.');
     }
   };
 
