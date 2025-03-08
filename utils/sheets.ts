@@ -2,16 +2,13 @@ import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
 import { ReceiptData } from './ocr';
 
-// Load the service account key
-const serviceAccountKey = require('../config/service-account.json');
-
 // Initialize the Google Sheets API client
 const sheets = google.sheets('v4');
 
-// Create JWT client for authentication
+// Create JWT client for authentication using environment variables
 const auth = new google.auth.JWT({
-  email: serviceAccountKey.client_email,
-  key: serviceAccountKey.private_key,
+  email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+  key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'), // Replace escaped newlines
   scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
 
