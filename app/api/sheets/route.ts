@@ -19,7 +19,7 @@ const sheets = google.sheets('v4');
 // Create JWT client for authentication using environment variables
 const auth = new google.auth.JWT({
   email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-  key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'), // Replace escaped newlines
+  key: process.env.GOOGLE_PRIVATE_KEY?.split(String.raw`\n`).join('\n'), // Handle newlines properly
   scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
 
