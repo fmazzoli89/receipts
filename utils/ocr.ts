@@ -17,10 +17,12 @@ export async function processReceipt(imageData: string): Promise<ReceiptData> {
       throw new Error('Invalid image data provided');
     }
 
-    // Ensure the image data is not too large (max 10MB)
-    const approximateSizeInBytes = (imageData.length * 3) / 4; // Approximate size of base64 data
-    if (approximateSizeInBytes > 10 * 1024 * 1024) {
-      throw new Error('Image size too large. Please use an image under 10MB.');
+    // Extract the base64 data from the Data URL if present
+    const base64Data = imageData.split(',')[1] || imageData;
+
+    // Validate base64 string
+    if (!base64Data.match(/^[A-Za-z0-9+/=]+$/)) {
+      throw new Error('Invalid image format');
     }
 
     const response = await fetch('/api/ocr', {
@@ -33,7 +35,9 @@ export async function processReceipt(imageData: string): Promise<ReceiptData> {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || 'Failed to process receipt');
+      const errorMessage = errorData.error || 'Failed to process receipt';
+      console.error('OCR API Error:', errorMessage);
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
@@ -44,7 +48,16 @@ export async function processReceipt(imageData: string): Promise<ReceiptData> {
     }
 
     if (!data.storeName || !data.date || !Array.isArray(data.items) || typeof data.total !== 'number') {
+      console.error('Invalid response structure:', data);
       throw new Error('Invalid receipt data structure');
+    }
+
+    // Validate items array
+    for (const item of data.items) {
+      if (!item.name || typeof item.price !== 'number') {
+        console.error('Invalid item structure:', item);
+        throw new Error('Invalid item data structure');
+      }
     }
 
     return data;

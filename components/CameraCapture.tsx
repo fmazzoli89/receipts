@@ -13,13 +13,42 @@ export default function CameraCapture() {
   const [isSaving, setIsSaving] = useState(false);
   const webcamRef = useRef<Webcam>(null);
 
-  const capture = useCallback(() => {
-    if (webcamRef.current) {
-      const imageSrc = webcamRef.current.getScreenshot();
-      setImage(imageSrc);
-      handleImageProcessing(imageSrc);
-    }
-  }, [webcamRef]);
+  const optimizeImage = async (imageSrc: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        // Calculate new dimensions while maintaining aspect ratio
+        let width = img.width;
+        let height = img.height;
+        const maxDimension = 1024; // Max dimension of 1024px
+        
+        if (width > height && width > maxDimension) {
+          height = (height * maxDimension) / width;
+          width = maxDimension;
+        } else if (height > maxDimension) {
+          width = (width * maxDimension) / height;
+          height = maxDimension;
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Could not get canvas context'));
+          return;
+        }
+        
+        ctx.drawImage(img, 0, 0, width, height);
+        // Convert to JPEG with 0.8 quality
+        resolve(canvas.toDataURL('image/jpeg', 0.8));
+      };
+      
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = imageSrc;
+    });
+  };
 
   const handleImageProcessing = async (imageSrc: string | null) => {
     if (!imageSrc) {
@@ -29,7 +58,9 @@ export default function CameraCapture() {
     
     setIsProcessing(true);
     try {
-      const data = await processReceipt(imageSrc);
+      // Optimize image before processing
+      const optimizedImage = await optimizeImage(imageSrc);
+      const data = await processReceipt(optimizedImage);
       if (!data) {
         throw new Error('No data received from receipt processing');
       }
@@ -42,6 +73,8 @@ export default function CameraCapture() {
           errorMessage = 'Image is too large. Please use a smaller image.';
         } else if (error.message.includes('API key')) {
           errorMessage = 'Server configuration error. Please try again later.';
+        } else if (error.message.includes('Failed to load image')) {
+          errorMessage = 'Failed to load image. Please try a different image.';
         }
       }
       alert(errorMessage);
@@ -93,10 +126,10 @@ export default function CameraCapture() {
       return;
     }
 
-    // Validate file size (max 5MB)
-    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB in bytes
+    // Validate file size (max 10MB)
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
     if (file.size > MAX_FILE_SIZE) {
-      alert('Please upload an image smaller than 5MB');
+      alert('Please upload an image smaller than 10MB');
       return;
     }
 
@@ -128,6 +161,18 @@ export default function CameraCapture() {
       alert('Error reading file. Please try again.');
     }
   };
+
+  const capture = useCallback(() => {
+    if (webcamRef.current) {
+      const imageSrc = webcamRef.current.getScreenshot();
+      if (imageSrc) {
+        setImage(imageSrc);
+        handleImageProcessing(imageSrc);
+      } else {
+        alert('Failed to capture image. Please try again.');
+      }
+    }
+  }, [webcamRef]);
 
   return (
     <div className="space-y-4">
