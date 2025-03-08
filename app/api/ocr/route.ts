@@ -43,7 +43,7 @@ export async function POST(request: Request) {
             content: [
               {
                 type: "text",
-                text: "Extract this information from the receipt and return it in valid JSON format: { storeName: string, date: string, items: [{ name: string, price: number }], total: number }"
+                text: "You are a receipt scanner. Extract the following information from this receipt image and return it in this exact JSON format, with no additional text or explanation: { \"storeName\": string, \"datetime\": string (full date and time if available), \"items\": [{ \"name\": string, \"price\": number, \"category\": string }], \"total\": number }. For each item's category, use one of these options: Groceries, Restaurant, Entertainment, Electronics, Clothing, Health, Transportation, Utilities, Home, Office Supplies, Personal Care, Subscriptions, Other. Base the category on both the item name and store type."
               },
               {
                 type: "image_url",
@@ -73,27 +73,27 @@ export async function POST(request: Request) {
         throw new Error('No response from OpenAI');
       }
 
-      // Try to clean the response if it's not valid JSON
-      let cleanedResult = result;
-      if (result.includes('```json')) {
-        cleanedResult = result.split('```json')[1].split('```')[0].trim();
-      } else if (result.includes('```')) {
-        cleanedResult = result.split('```')[1].split('```')[0].trim();
-      }
-
       try {
-        console.log('Attempting to parse response:', cleanedResult);
-        const parsedResult = JSON.parse(cleanedResult);
+        console.log('Attempting to parse response:', result);
+        const parsedResult = JSON.parse(result);
         
         // Validate the parsed result structure
-        if (!parsedResult.storeName || !parsedResult.date || !Array.isArray(parsedResult.items) || typeof parsedResult.total !== 'number') {
+        if (!parsedResult.storeName || !parsedResult.datetime || !Array.isArray(parsedResult.items) || typeof parsedResult.total !== 'number') {
           console.error('Invalid data structure in response:', parsedResult);
           throw new Error('Invalid data structure in response');
         }
 
+        // Validate each item has the required fields
+        for (const item of parsedResult.items) {
+          if (!item.name || typeof item.price !== 'number' || !item.category) {
+            console.error('Invalid item structure:', item);
+            throw new Error('Invalid item structure in response');
+          }
+        }
+
         return NextResponse.json(parsedResult);
       } catch (parseError) {
-        console.error('Error parsing OpenAI response:', parseError, '\nCleaned response:', cleanedResult);
+        console.error('Error parsing OpenAI response:', parseError, '\nResponse:', result);
         return NextResponse.json(
           { error: 'Failed to parse OpenAI response' },
           { status: 500 }
