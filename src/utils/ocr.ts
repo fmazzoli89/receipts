@@ -1,4 +1,4 @@
-import { createWorker } from 'tesseract.js';
+import { createWorker, Worker } from 'tesseract.js';
 
 export interface ReceiptItem {
   name: string;
@@ -13,11 +13,13 @@ export interface ReceiptData {
 }
 
 export async function processReceipt(imageData: string): Promise<ReceiptData> {
-  const worker = await createWorker();
+  const worker = await createWorker('eng');
   
   try {
-    await worker.loadLanguage('eng');
-    await worker.initialize('eng');
+    await worker.load();
+    await worker.setParameters({
+      tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz$.,/-',
+    });
     
     const { data: { text } } = await worker.recognize(imageData);
     
